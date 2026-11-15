@@ -9,7 +9,7 @@
 <title>CORDILLERA</title>
 <style>
   body{font-family:system-ui;background:#0f172a;color:#e2e8f0;padding:20px}
-  pre{background:#1e293b;padding:12px;border-radius:8px;white-space:pre-wrap}
+  pre{background:#1e293b;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all}
   button{font-size:18px;padding:14px;width:100%;margin:8px 0;border:0;border-radius:10px;background:#2563eb;color:#fff}
 </style>
 </head>
@@ -18,8 +18,12 @@
 <pre id="info"></pre>
 <button id="btnPermiso">1. Activar notificaciones</button>
 <button id="btnPrueba">2. Notificación de prueba</button>
+<button id="btnSuscribir">3. Suscribirse a push (y copiar)</button>
+<pre id="sub"></pre>
 
 <script>
+const VAPID_PUBLIC = 'BNiYQ7umYvxzAhubsUMxlBL9dbnvCNimZb5X05rP5V4C5M289dZbrW5J_GmxdYvdK0P6HG3MUF62yDqrXDNgrZE';
+
 const log = t => document.getElementById('info').textContent += t + '\n';
 
 const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -27,17 +31,16 @@ log('Instalada: ' + (instalada ? 'SÍ' : 'NO'));
 log('PushManager: ' + ('PushManager' in window ? 'SÍ' : 'NO'));
 log('Permiso: ' + (window.Notification ? Notification.permission : 'no disponible'));
 
-navigator.serviceWorker.register('./sw.js')
+// updateViaCache:'none' → el teléfono siempre busca el sw.js nuevo
+navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
   .then(() => log('Service Worker: OK'))
   .catch(e => log('Service Worker: ERROR ' + e));
 
-// Botón 1: pedir permiso (iOS exige que sea al tocar un botón)
 document.getElementById('btnPermiso').onclick = async () => {
   const p = await Notification.requestPermission();
   log('Permiso: ' + p);
 };
 
-// Botón 2: notificación local (en iOS debe salir desde el service worker)
 document.getElementById('btnPrueba').onclick = async () => {
   const reg = await navigator.serviceWorker.ready;
   await reg.showNotification('CORDILLERA', {
@@ -45,6 +48,33 @@ document.getElementById('btnPrueba').onclick = async () => {
     icon: 'icon-192.png'
   });
   log('Prueba enviada');
+};
+
+// Convierte la clave pública al formato que pide el navegador
+function claveABytes(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Botón 3: pedir a Apple/Google la "dirección" push de este teléfono
+document.getElementById('btnSuscribir').onclick = async () => {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: claveABytes(VAPID_PUBLIC)
+      });
+    }
+    const json = JSON.stringify(sub);
+    document.getElementById('sub').textContent = json;
+    await navigator.clipboard.writeText(json);
+    log('Suscrito ✔ (copiado al portapapeles)');
+  } catch (e) {
+    log('Suscripción ERROR: ' + e);
+  }
 };
 </script>
 </body>
