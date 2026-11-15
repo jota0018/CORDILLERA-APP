@@ -10,11 +10,14 @@
 <style>
   body{font-family:system-ui;background:#0f172a;color:#e2e8f0;padding:20px}
   pre{background:#1e293b;padding:12px;border-radius:8px;white-space:pre-wrap}
+  button{font-size:18px;padding:14px;width:100%;margin:8px 0;border:0;border-radius:10px;background:#2563eb;color:#fff}
 </style>
 </head>
 <body>
 <h2>CORDILLERA</h2>
 <pre id="info"></pre>
+<button id="btnPermiso">1. Activar notificaciones</button>
+<button id="btnPrueba">2. Notificación de prueba</button>
 
 <script>
 const log = t => document.getElementById('info').textContent += t + '\n';
@@ -22,10 +25,27 @@ const log = t => document.getElementById('info').textContent += t + '\n';
 const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 log('Instalada: ' + (instalada ? 'SÍ' : 'NO'));
 log('PushManager: ' + ('PushManager' in window ? 'SÍ' : 'NO'));
+log('Permiso: ' + (window.Notification ? Notification.permission : 'no disponible'));
 
 navigator.serviceWorker.register('./sw.js')
   .then(() => log('Service Worker: OK'))
   .catch(e => log('Service Worker: ERROR ' + e));
+
+// Botón 1: pedir permiso (iOS exige que sea al tocar un botón)
+document.getElementById('btnPermiso').onclick = async () => {
+  const p = await Notification.requestPermission();
+  log('Permiso: ' + p);
+};
+
+// Botón 2: notificación local (en iOS debe salir desde el service worker)
+document.getElementById('btnPrueba').onclick = async () => {
+  const reg = await navigator.serviceWorker.ready;
+  await reg.showNotification('CORDILLERA', {
+    body: 'Prueba: Puerta 1 abierta más de 2 min',
+    icon: 'icon-192.png'
+  });
+  log('Prueba enviada');
+};
 </script>
 </body>
 </html>
